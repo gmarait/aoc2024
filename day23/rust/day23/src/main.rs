@@ -1,11 +1,10 @@
 use std::fs;
 use regex::Regex;
 use std::collections::HashMap;
-//use indicatif::ProgressBar;
-//use std::collections::HashSet;
 
-/*
 fn add_edge(graph : &mut HashMap<String, Vec<String>>, n0 : &String, n1 : &String){
+
+    // Add edge in one direction only
 
     if n0 < n1{
         match graph.get_mut(n0) {
@@ -23,6 +22,7 @@ fn add_edge(graph : &mut HashMap<String, Vec<String>>, n0 : &String, n1 : &Strin
 }
 
 fn part_1(graph : &HashMap<String, Vec<String>>){
+    println!("Part 1");
 
     let mut count = 0;
 
@@ -62,52 +62,46 @@ fn part_1(graph : &HashMap<String, Vec<String>>){
 
     println!("Found: {count}");
 }
- */
 
-fn add_edge(graph : &mut HashMap<String, Vec<String>>, n0 : &String, n1 : &String){
 
-    match graph.get_mut(n0) {
-        Some(vec) => vec.push(n1.to_string()),
-        None => {
-            let mut newvec : Vec<String> = Vec::new();
-            newvec.push(n1.to_string());
-            graph.insert(n0.to_string(), newvec);
-        },
+fn add_empty_nodes(graph : &mut HashMap<String, Vec<String>>){
+    // Make sure all nodes are in the keys of the graph
+
+    let mut nodes_to_add : Vec<String> = Vec::new();
+
+    for(_node1, neigh1) in & *graph{
+
+        for nei in neigh1{
+            match graph.get(nei) {
+                Some(_n) => {},
+                None => {
+                    nodes_to_add.push(nei.to_string());
+                },
+            }
+        }
     }
 
-    // Add empty list for new nodes
-    match graph.get_mut(n1) {
-        Some(_vec) => {},
-        None => {
-            let newvec : Vec<String> = Vec::new();
-            graph.insert(n1.to_string(), newvec);
-        },
+    for nei in nodes_to_add{
+        let newvec : Vec<String> = Vec::new();
+        graph.insert(nei.to_string(), newvec);
     }
 }
 
 fn part_2(graph : &HashMap<String, Vec<String>>){
+    println!("Part 2");
 
     let mut biggest_clique_size = 0;
     let mut biggest_clique : Vec<String> = Vec::new();
 
     fn is_nei_of(graph : &HashMap<String, Vec<String>>, n1 : &String, n2 : &String) -> bool {
-        match graph.get(n1) {
-            Some(neigh) => {
-                for n in neigh{
-                    if n == n2 { return true; }
-                }
-            },
-            None => {},
+        for n in graph.get(n1).unwrap(){
+            if n == n2 { return true; }
         }
 
-        match graph.get(n2) {
-            Some(neigh) => {
-                for n in neigh{
-                    if n == n1 { return true; }
-                }
-            },
-            None => {},
+        for n in graph.get(n2).unwrap(){
+            if n == n1 { return true; }
         }
+
         return false;
     }
 
@@ -182,10 +176,10 @@ fn main() {
         add_edge(&mut graph, &link[0].to_string(), &link[1].to_string());
     }
 
-    for(_node, neigh) in &mut graph{ neigh.sort(); }
+    //println!("{:?}", graph);
+    part_1(&graph);
 
-    println!("{:?}", graph);
+    add_empty_nodes(&mut graph);
 
-    //part_1(&graph);
     part_2(&graph);
 }

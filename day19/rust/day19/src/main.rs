@@ -2,6 +2,7 @@ use std::fs;
 use regex::Regex;
 use std::collections::HashMap;
 use indicatif::ProgressBar;
+use std::collections::HashSet;
 
 fn read_lines(filename: &str) -> Vec<String> {
     fs::read_to_string(filename)
@@ -11,6 +12,7 @@ fn read_lines(filename: &str) -> Vec<String> {
         .collect()  // gather them together into a vector
 }
 
+/*
 fn towel_possible(avail_map : &HashMap<char, Vec<String>>, towel : &String, first_idx : usize) -> bool {
     //println!("towel: {:?}", towel);
     //println!("first_idx: {:?}", first_idx);
@@ -47,10 +49,60 @@ fn towel_possible(avail_map : &HashMap<char, Vec<String>>, towel : &String, firs
         },
     }
 }
+ */
+
+fn towel_all_possibilities(avail_map : &HashMap<char, Vec<String>>, towel : &String, first_idx : usize, count : &mut usize, done : &mut HashSet<(String, String)>){
+    //println!("first_idx: {:?}", first_idx);
+    //println!("> {:?}", towel[first_idx..].to_string());
+
+    let prefix = towel[..first_idx].to_string();
+
+    let sletter = towel.chars().nth(first_idx).unwrap();
+
+    match avail_map.get(&sletter) {
+        Some(poss) => {
+            for p in poss{
+                //println!(" < {p}");
+                let l = p.len();
+                let next_idx = first_idx + l;
+
+                if next_idx <= towel.len(){
+                    //println!("next {}", towel[first_idx..next_idx].to_string());
+                    //println!("{first_idx} - {next_idx}");
+
+                    let tow = towel[first_idx..next_idx].to_string();
+                    let pstr : String = String::from(p);
+
+                    let node = (prefix.clone(), pstr.clone());
+                    if done.contains(&node){
+                        continue;
+                    }
+
+                    println!("{:?}", node);
+
+                    if *p == tow{
+                        if next_idx == towel.len(){
+                            *count += 1;
+                        }
+                        else{
+                            towel_all_possibilities(avail_map, towel, next_idx, count, done);
+                        }
+                    }
+
+                    done.insert(node);
+                }
+            }
+        },
+        None => {
+            //println!("Found: false");
+        },
+    }
+    println!("{:?}, {count}", done);
+}
 
 fn main() {
-    let file_path = "../../input/input.txt";
-    //let file_path = "../../input/test.txt";
+    //let file_path = "../../input/input.txt";
+    let file_path = "../../input/test.txt";
 
     let re_split = Regex::new(r", ").unwrap();
 
@@ -76,11 +128,12 @@ fn main() {
     //println!("{:?}", avail);
     println!("{:?}", hash_first_letter);
 
-    let towels = &lines[2..];
-    //let mut towels : Vec<String> = Vec::new();
-    //towels.push("brwrr".to_string());
-    //println!("{:?}", towels);
+    //let towels = &lines[2..];
+    let mut towels : Vec<String> = Vec::new();
+    towels.push("brgr".to_string());
+    println!("{:?}", towels);
 
+    /*
     let mut possibles = 0;
     let bar = ProgressBar::new(towels.len().try_into().unwrap());
     for t in towels{
@@ -93,6 +146,19 @@ fn main() {
         bar.inc(1);
     }
     bar.finish();
+    */
 
-    println!("Number of possible towels: {possibles}");
+    let mut possibles = 0;
+    let mut done : HashSet<(String, String)> = HashSet::new();
+    let bar = ProgressBar::new(towels.len().try_into().unwrap());
+    for t in towels{
+        let mut n_pos = 0;
+        towel_all_possibilities(&hash_first_letter, &t, 0, &mut n_pos, &mut done);
+        done.clear();
+        possibles += n_pos;
+        bar.inc(1);
+    }
+    bar.finish();
+
+    println!("Number of all possible towel configurations: {possibles}");
 }
