@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fmt;
 
+#[derive(Clone)]
 enum Operation{
     OR,
     XOR,
@@ -30,6 +31,7 @@ fn op_to_str(s : &Operation) -> String{
     }
 }
 
+#[derive(Clone)]
 struct Instruction{
     in1: String,
     in2: String,
@@ -97,7 +99,17 @@ fn main() {
     let bin_num_z = num_to_bin(expected_zval);
     println!("expected zval binary -> {:?}", bin_num_z);
 
-    part_1(&mut states, &mut instr);
+    let bin_num_comp = part_1(&mut states.clone(), &mut instr.clone());
+
+    println!("{:?}", bin_num_comp);
+    let result_part_1 = bin_to_num(&bin_num_comp);
+    println!("Result part 1: {result_part_1}");
+
+    for i in 0..bin_num_comp.len(){
+        if bin_num_comp[i] != bin_num_z[i]{
+            println!("{i} --> {} - {} - X", bin_num_comp[i], bin_num_z[i]);
+        }
+    }
 }
 
 fn get_wires(states : &HashMap<String, bool>, c : char) -> Vec<String>{
@@ -204,7 +216,28 @@ fn compute_circuit(states : &mut HashMap<String, bool>, instr: &Vec<Instruction>
     }
 }
 
-fn part_1(states : &mut HashMap<String, bool>, instr: &Vec<Instruction>){
+fn part_1(states : &mut HashMap<String, bool>, instr: &mut Vec<Instruction>) -> Vec<char> {
+    let swaps : Vec<(String, String)> = Vec::new();
+
+    return compute_with_swaps(states, instr, &swaps);
+}
+
+fn compute_with_swaps(states : &mut HashMap<String, bool>, instr: &mut Vec<Instruction>, swaps : &Vec<(String, String)>) -> Vec<char> {
+
+    fn swap_outputs(instr: &mut Vec<Instruction>, swaps : &Vec<(String, String)>){
+        for (out1, out2) in swaps{
+            for i in &mut *instr{
+                if i.output == *out1{
+                    i.output = out2.to_string();
+                }
+                else if i.output == *out2{
+                    i.output = out1.to_string();
+                }
+            }
+        }
+    }
+
+    swap_outputs(instr, swaps);
 
     compute_circuit(states, instr);
     //println!("{:?}", states);
@@ -212,9 +245,5 @@ fn part_1(states : &mut HashMap<String, bool>, instr: &Vec<Instruction>){
     let z_wires : Vec<String> = get_wires(&states, 'z');
     let bin_num = get_bin_from_wires(&states, &z_wires);
 
-    println!("{:?}", bin_num);
-
-    let result = bin_to_num(&bin_num);
-
-    println!("Result: {result}");
+    return bin_num;
 }
