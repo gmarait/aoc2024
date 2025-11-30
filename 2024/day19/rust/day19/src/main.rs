@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use indicatif::ProgressBar;
 use std::collections::HashSet;
 
-fn read_lines(filename: &str) -> Vec<String> {
+ fn read_lines(filename: &str) -> Vec<String> {
     fs::read_to_string(filename)
         .unwrap()  // panic on possible file-reading errors
         .lines()  // split the string into an iterator of string slices

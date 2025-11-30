@@ -3,6 +3,8 @@ use regex::Regex;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fmt;
+use std::fs::File;
+use std::io::{BufWriter, Write};
 
 #[derive(Clone)]
 enum Operation{
@@ -54,6 +56,7 @@ fn main() {
 
     let mut states : HashMap<String, bool> = HashMap::new();
     let mut instr : Vec<Instruction> = Vec::new();
+    let mut list_outputs : HashSet<String> = HashSet::new();
 
     for line in fs::read_to_string(file_path).unwrap().lines(){
 
@@ -75,8 +78,8 @@ fn main() {
             };
 
             instr.push(i);
+            list_outputs.insert(caps[4].to_string());
         }
-
     }
 
     //println!("{:?}", states);
@@ -84,32 +87,107 @@ fn main() {
 
     let x_wires : Vec<String> = get_wires(&states, 'x');
     let bin_num_x = get_bin_from_wires(&states, &x_wires);
-    println!("x -> {:?}", bin_num_x);
+    //println!("x -> {:?}", bin_num_x);
     let xval = bin_to_num(&bin_num_x);
-    println!("xval -> {xval}");
+    //println!("xval -> {xval}");
 
     let y_wires : Vec<String> = get_wires(&states, 'y');
     let bin_num_y = get_bin_from_wires(&states, &y_wires);
-    println!("y -> {:?}", bin_num_y);
+    //println!("y -> {:?}", bin_num_y);
     let yval = bin_to_num(&bin_num_y);
-    println!("yval -> {xval}");
+    //println!("yval -> {xval}");
 
     let expected_zval = xval + yval;
-    println!("expected zval -> {expected_zval}");
+    //println!("expected zval -> {expected_zval}");
     let bin_num_z = num_to_bin(expected_zval);
-    println!("expected zval binary -> {:?}", bin_num_z);
+    //println!("expected zval binary -> {:?}", bin_num_z);
 
-    let bin_num_comp = part_1(&mut states.clone(), &mut instr.clone());
+    let mut swaps : Vec<(String, String)> = Vec::new();
+    let bin_num_comp = compute_with_swaps(&mut states.clone(), &mut instr.clone(), &swaps);
 
-    println!("{:?}", bin_num_comp);
+    //println!("{:?}", bin_num_comp);
     let result_part_1 = bin_to_num(&bin_num_comp);
     println!("Result part 1: {result_part_1}");
 
+    // Part 2
+    swaps.push(("dhg".to_string(), "z06".to_string()));
+    swaps.push(("brk".to_string(), "dpd".to_string()));
+    swaps.push(("bhd".to_string(), "z23".to_string()));
+    //swaps.push(("z45".to_string(), "jrm".to_string()));
+    let bin_num_comp = compute_with_swaps(&mut states.clone(), &mut instr.clone(), &swaps);
+
+    let num_ob = bin_to_num(&bin_num_comp);
+    println!("Now getting: {num_ob}");
+
+    swap_outputs(&mut instr, &swaps);
+
+    let mut suspects : HashSet<String> = HashSet::new();
+
+    print!("Z expected: {expected_zval} = ");
+    print_bin(&bin_num_z);
+    print!("Z found: {num_ob} = ");
+    print_bin(&bin_num_comp);
+
     for i in 0..bin_num_comp.len(){
         if bin_num_comp[i] != bin_num_z[i]{
-            println!("{i} --> {} - {} - X", bin_num_comp[i], bin_num_z[i]);
+            suspects.insert(format!("z{:02}", i).to_string());
+            println!("Diff in bit {i} --> {} - {}", bin_num_comp[i], bin_num_z[i]);
         }
     }
+
+    for i in 0..(bin_num_z.len() - bin_num_comp.len()){
+        let k = bin_num_comp.len() + i - 1;
+        suspects.insert(format!("z{:02}", k).to_string());
+        println!("Diff in bit {k} --> . - {}", bin_num_z[k]);
+    }
+
+    let mut growing = true;
+    let mut n_suspects = suspects.len();
+
+    while growing{
+        for ins in &instr{
+            let mut new_sus : Vec<String> = Vec::new();
+            for sus in &suspects{
+                if ins.output == *sus{
+
+                    if list_outputs.contains(&ins.in1){
+                        new_sus.push(ins.in1.to_string());
+                    }
+                    if list_outputs.contains(&ins.in2){
+                        new_sus.push(ins.in2.to_string());
+                    }
+                }
+            }
+
+            for n in new_sus{
+                suspects.insert(n.to_string());
+            }
+        }
+
+        if suspects.len() > n_suspects{
+            n_suspects = suspects.len();
+        }
+        else{
+            growing = false;
+        }
+        println!("number of suspects: {}", suspects.len());
+    }
+
+    println!("Suspects: {:?}", suspects);
+
+    write_to_dot(&instr, &suspects);
+
+    let mut sol_part2 : Vec<String> = Vec::new();
+    for (w1, w2) in swaps{
+        sol_part2.push(w1.to_string());
+        sol_part2.push(w2.to_string());
+    }
+    sol_part2.sort();
+    println!("Sol part 2:");
+    for s in sol_part2{
+        print!("{},", s);
+    }
+    println!("");
 }
 
 fn get_wires(states : &HashMap<String, bool>, c : char) -> Vec<String>{
@@ -161,7 +239,7 @@ fn num_to_bin(num : usize) -> Vec<char>{
     let mut bin : Vec<char> = Vec::new();
 
     let mut cur_num = num;
-    while cur_num > 1{
+    while cur_num >= 1{
         if cur_num % 2 == 1{
             bin.push('1');
         }
@@ -174,6 +252,13 @@ fn num_to_bin(num : usize) -> Vec<char>{
     bin.push('1');
 
     return bin;
+}
+
+fn print_bin(bin : &Vec<char>){
+    for i in (0..bin.len()).rev(){
+        print!("{}", bin[i]);
+    }
+    println!("");
 }
 
 fn compute_circuit(states : &mut HashMap<String, bool>, instr: &Vec<Instruction>){
@@ -216,26 +301,20 @@ fn compute_circuit(states : &mut HashMap<String, bool>, instr: &Vec<Instruction>
     }
 }
 
-fn part_1(states : &mut HashMap<String, bool>, instr: &mut Vec<Instruction>) -> Vec<char> {
-    let swaps : Vec<(String, String)> = Vec::new();
-
-    return compute_with_swaps(states, instr, &swaps);
-}
-
-fn compute_with_swaps(states : &mut HashMap<String, bool>, instr: &mut Vec<Instruction>, swaps : &Vec<(String, String)>) -> Vec<char> {
-
-    fn swap_outputs(instr: &mut Vec<Instruction>, swaps : &Vec<(String, String)>){
-        for (out1, out2) in swaps{
-            for i in &mut *instr{
-                if i.output == *out1{
-                    i.output = out2.to_string();
-                }
+fn swap_outputs(instr: &mut Vec<Instruction>, swaps : &Vec<(String, String)>){
+    for (out1, out2) in swaps{
+        for i in &mut *instr{
+            if i.output == *out1{
+                i.output = out2.to_string();
+            }
                 else if i.output == *out2{
                     i.output = out1.to_string();
                 }
-            }
         }
     }
+}
+
+fn compute_with_swaps(states : &mut HashMap<String, bool>, instr: &mut Vec<Instruction>, swaps : &Vec<(String, String)>) -> Vec<char> {
 
     swap_outputs(instr, swaps);
 
@@ -246,4 +325,29 @@ fn compute_with_swaps(states : &mut HashMap<String, bool>, instr: &mut Vec<Instr
     let bin_num = get_bin_from_wires(&states, &z_wires);
 
     return bin_num;
+}
+
+fn write_to_dot(instr: &Vec<Instruction>, suspects : &HashSet<String>){
+
+    let f = File::create("graph.dot").expect("Unable to create file");
+    let mut f = BufWriter::new(f);
+    f.write_all("digraph G {\n".as_bytes()).expect("Unable to write data");
+
+    for i in instr{
+        let gate_name = format!("{}_{}_{}", i.in1, op_to_str(&i.op), i.in2);
+        let edge1 = format!("  {} -> {};\n", i.in1, gate_name);
+        f.write_all(edge1.as_bytes()).expect("Unable to write data");
+        let edge2 = format!("  {} -> {};\n", i.in2, gate_name);
+        f.write_all(edge2.as_bytes()).expect("Unable to write data");
+
+        if suspects.contains(&i.output){
+            let color_sus = format!("  {} [style=bold, color=red];\n", i.output);
+            f.write_all(color_sus.as_bytes()).expect("Unable to write data");
+        }
+
+        let edge3 = format!("  {} -> {};\n", gate_name, i.output);
+        f.write_all(edge3.as_bytes()).expect("Unable to write data");
+    }
+
+    f.write_all("}".as_bytes()).expect("Unable to write data");
 }
